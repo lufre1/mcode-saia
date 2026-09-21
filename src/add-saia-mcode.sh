@@ -104,6 +104,25 @@ for m in "${MODELS[@]}"; do
   MODEL_FLAGS="$MODEL_FLAGS --model $m"
 done
 
+# ── Drop any previous GWDG SAIA provider ─────────────────────────────
+# `mcode provider add` does not replace an existing provider, it appends a
+# suffixed clone (gwdg-saia-2, -3, ...). Remove first so re-running the
+# installer is idempotent instead of accumulating duplicates.
+for pid in $(mcode provider list --json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for p in d.get('providers', []):
+    pid = p.get('providerId', '')
+    if pid.startswith('custom_provider:gwdg-saia'):
+        print(pid)
+"); do
+  echo "Removing existing provider $pid"
+  mcode provider remove "$pid" --yes >/dev/null 2>&1 || echo "  WARNING: could not remove $pid" >&2
+done
+
 # ── Run provider add ─────────────────────────────────────────────────
 echo "Adding GWDG SAIA provider to mcode..."
 echo "Base URL: https://chat-ai.academiccloud.de/v1"
@@ -120,3 +139,45 @@ mcode provider add \
 echo ""
 echo "Provider added. Verifying..."
 mcode provider list --json | python3 -c "import json,sys; d=json.load(sys.stdin); providers=[p for p in d['providers'] if 'saia' in p.get('name','').lower()]; print(json.dumps(providers, indent=2))"
+
+DATA_DIR="${MINIMAX_DATA_DIR:-$HOME/.minimax}"
+CONFIG_YAML="$DATA_DIR/config.yaml"
+DEFAULT_MODEL="${SAIA_DEFAULT_MODEL:-deepseek-v4-flash-0731}"
+
+# ── Make SAIA the default model ──────────────────────────────────────
+# Not cosmetic: mcode gates every turn on a MiniMax account login whenever the
+# DEFAULT model belongs to a managed-login provider — the check runs at startup,
+# so even `--model custom_provider:gwdg-saia/...` still hits "Sign in to MiniMax
+# to use Agent features". Pointing defaultModel at SAIA makes mcode usable with
+# no MiniMax account at all.
+echo ""
+echo "Setting default model to custom_provider:gwdg-saia/$DEFAULT_MODEL..."
+
+SAIA_CONFIG_YAML="$CONFIG_YAML" SAIA_DEFAULT="custom_provider:gwdg-saia/$DEFAULT_MODEL" python3 <<'PYDEFAULT'
+import os
+
+path = os.environ["SAIA_CONFIG_YAML"]
+want = os.environ["SAIA_DEFAULT"]
+
+with open(path) as f:
+    lines = f.readlines()
+
+for i, line in enumerate(lines):
+    if line.startswith("defaultModel:"):
+        current = line.split(":", 1)[1].strip()
+        # Leave a default the user picked themselves alone; only take over one
+        # that points at a managed-login provider (which is what gates mcode).
+        if current and not current.startswith("minimax"):
+            print("  left as-is: %s" % current)
+            break
+        lines[i] = "defaultModel: %s\n" % want
+        print("  %s -> %s" % (current or "(empty)", want))
+        break
+else:
+    lines.insert(0, "defaultModel: %s\n" % want)
+    print("  added: %s" % want)
+
+with open(path, "w") as f:
+    f.writelines(lines)
+PYDEFAULT
+

@@ -13,6 +13,7 @@ SAIA_API_KEY="your-key" bash install-mcode-saia.sh --yes
 This one-shot installer:
 - Installs mcode (if missing) via the official GitHub installer
 - Registers the GWDG SAIA provider with 16 ready models
+- Points `defaultModel` at SAIA, so mcode runs with **no MiniMax account** — see [Outage resilience](SETUP.md#outage-resilience) for what mcode does and does not survive
 - Works on macOS, Linux, and WSL
 
 Or see `SETUP.md` for detailed instructions and troubleshooting.
@@ -25,11 +26,14 @@ Or see `SETUP.md` for detailed instructions and troubleshooting.
 | `build.sh` | Regenerates the installer from source files |
 | `src/add-saia-mcode.sh` | Live source script (portable key sourcing) |
 | `src/models.txt` | List of 16 ready SAIA models |
+| `test/fake-saia.py` | Fake SAIA endpoint that 503s on demand (not packed) |
+| `test/test-resume.sh` | Measures how much of an outage mcode absorbs (not packed) |
 
 ## Architecture
 
 ```
-SAIA_API_KEY → install-mcode-saia.sh → [mcode install] → src/add-saia-mcode.sh → mcode provider add → ~/.minimax/config.yaml
+SAIA_API_KEY → install-mcode-saia.sh → [mcode install] → src/add-saia-mcode.sh ─┬─ mcode provider add → ~/.minimax/config.yaml
+                                                                              └─ defaultModel     → ~/.minimax/config.yaml
 ```
 
 ## Maintaining

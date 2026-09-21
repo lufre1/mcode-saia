@@ -162,17 +162,13 @@ if [[ -f "$CONFIG_FILE" ]]; then
   fi
 fi
 
-# ── Run the installer script ─────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"$SCRIPT_DIR/src/add-saia-mcode.sh"
-
-echo ""
-echo "✓ GWDG SAIA provider installed successfully!"
-echo "  Provider ID: custom_provider:gwdg-saia"
-echo "  Models: 16 ready SAIA models"
-echo ""
-echo "Usage: mcode --model custom_provider:gwdg-saia/<model>"
-echo "       mcode --model custom_provider:gwdg-saia/deepseek-v4-flash-0731"
+# ── Unpack the bundled source files ──────────────────────────────────
+# Into a temp dir, not next to the installer: this file is meant to be copied
+# to a fresh machine on its own, and it must not litter (or overwrite) a repo
+# checkout it happens to be run from.
+EXTRACT_DIR="$(mktemp -d)"
+trap 'rm -rf "$EXTRACT_DIR"' EXIT
+mkdir -p "$EXTRACT_DIR/src"
 MCS_GEN_BODY
 
 # ── Append the packed source files ───────────────────────────────────
@@ -180,12 +176,25 @@ echo "" >>"$TMP_OUT"
 echo "# ── Packed source files ────────────────────────────────────────────" >>"$TMP_OUT"
 
 for f in "${MANIFEST[@]}"; do
-  echo "echo 'Extracting $f...'" >>"$TMP_OUT"
-  echo "cat >\"$f\" <<'__MCS_EOF__'" >>"$TMP_OUT"
+  echo "cat >\"\$EXTRACT_DIR/$f\" <<'__MCS_EOF__'" >>"$TMP_OUT"
   cat "$f" >>"$TMP_OUT"
   echo "__MCS_EOF__" >>"$TMP_OUT"
   echo "" >>"$TMP_OUT"
 done
+
+# ── Static installer tail: run what we just unpacked ──────────────────
+cat >>"$TMP_OUT" <<'MCS_GEN_TAIL'
+chmod +x "$EXTRACT_DIR/src/add-saia-mcode.sh"
+"$EXTRACT_DIR/src/add-saia-mcode.sh"
+
+echo ""
+echo "✓ GWDG SAIA provider installed successfully!"
+echo "  Provider ID: custom_provider:gwdg-saia"
+echo "  Models: 16 ready SAIA models"
+echo ""
+echo "Usage: mcode                       # SAIA is the default model"
+echo "       mcode --model custom_provider:gwdg-saia/<model>"
+MCS_GEN_TAIL
 
 # ── Finalize ─────────────────────────────────────────────────────────
 mv "$TMP_OUT" "$OUT"

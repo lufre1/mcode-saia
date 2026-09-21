@@ -57,6 +57,7 @@ The installer will:
 - Back up your existing `~/.minimax/config.yaml` if it contains a `custom_provider:` block
 - Run `mcode provider add` with all 16 ready SAIA models
 - Verify the provider was added successfully
+- Set `defaultModel` to a SAIA model, so mcode runs without a MiniMax account
 
 ### 3. Verify installation
 
@@ -106,6 +107,45 @@ All 16 ready SAIA models:
 - meta-llama-3.1-8b-instruct
 - openai-gpt-oss-120b
 - qwen3-30b-a3b-instruct-2507
+
+## Outage resilience
+
+SAIA goes down. mcode does retry a failed turn on its own — but the envelope is
+small and, as far as can be determined on 0.5.1, **not configurable**.
+
+Measured against a fake endpoint that returns 503 (`test/test-resume.sh`):
+
+| Path | Requests before giving up | Survives |
+|------|---------------------------|----------|
+| `mcode exec` | 6 (1 + 5 retries) | 5 consecutive failures |
+| TUI (`mcode`) | 9 | 8 consecutive failures |
+
+Retries are back-to-back, so this is seconds of coverage, not minutes. **A SAIA
+outage lasting longer than that ends the turn** and you re-prompt by hand.
+
+### Why there is no knob
+
+mcode's bundled runtime contains a settings store with `retry.enabled`,
+`retry.maxRetries`, `retry.baseDelayMs` and `httpIdleTimeoutMs` (defaults 3 /
+2000 ms / 300 s), but mcode 0.5.1 never reads it: an `strace` of a full TUI
+session issuing nine LLM requests shows `settings.json` is not opened at any
+path, and `config.yaml` has no schema for those keys either. Writing
+`~/.minimax/settings.json` by hand does nothing — verified, retry on vs. off
+produced byte-identical behaviour.
+
+If a later mcode release wires that store up, the values worth setting are
+`retry.maxRetries: 8` and `retry.baseDelayMs: 5000` — an exponential ladder of
+5 s, 10 s, 20 s, 40 s, 80 s, 160 s, 320 s, 640 s, about 21 minutes of cover.
+
+### Measuring it yourself
+
+```bash
+bash test/test-resume.sh            # default: 3 failures, should PASS
+FAKE_FAIL_COUNT=8 bash test/test-resume.sh   # past the ceiling, should FAIL
+```
+
+Runs in a throwaway `MINIMAX_DATA_DIR` against `test/fake-saia.py`. Zero real
+SAIA requests. Not packed into the installer.
 
 ## Config schema
 
