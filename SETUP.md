@@ -6,14 +6,19 @@ This installer registers the GWDG SAIA provider in mcode (MiniMax Code) with all
 
 ## Prerequisites
 
-- **mcode** installed (`npm install -g @minimax-ai/code`)
 - **SAIA API key** (from GWDG SAIA)
+- **mcode** will be installed automatically if missing (via the official GitHub installer)
 
 ## Quick start
 
 ```bash
-SAIA_API_KEY="your-key" bash install-mcode-saia.sh
+SAIA_API_KEY="your-key" bash install-mcode-saia.sh --yes
 ```
+
+This one-shot installer:
+- Installs mcode (if missing) via the official GitHub installer
+- Registers the GWDG SAIA provider with 16 ready models
+- Works on macOS, Linux, and WSL
 
 ## Detailed installation
 
@@ -22,6 +27,19 @@ SAIA_API_KEY="your-key" bash install-mcode-saia.sh
 Your key is stored in `~/.local/share/opencode/auth.json` (if you use opencode with SAIA), or you can generate a new one at the GWDG SAIA portal.
 
 ### 2. Run the installer
+
+```bash
+# Option A: via environment variable (recommended)
+SAIA_API_KEY="your-key" bash install-mcode-saia.sh --yes
+
+# Option B: via --key argument
+bash install-mcode-saia.sh --key "your-key" --yes
+
+# Option C: via --key-file (reads from a file)
+bash install-mcode-saia.sh --key-file ~/.local/share/opencode/auth.json --yes
+```
+
+The `--yes` flag enables non-interactive mode and auto-installs mcode if missing. Without it, the installer will prompt before installing mcode.
 
 ```bash
 # Option A: via environment variable
@@ -143,7 +161,15 @@ SAIA_API_KEY="your-key" bash install-mcode-saia.sh
 
 ### mcode not found
 
-Install mcode:
+The installer automatically installs mcode via the official GitHub installer if missing:
+
+```bash
+curl -fsSL https://filecdn.minimax.chat/public/install.sh | bash
+```
+
+This uses an isolated Node.js 24 runtime and prebuilt native SQLite, so no system Node/npm or build tools are required.
+
+Alternatively, you can install manually:
 
 ```bash
 npm install -g @minimax-ai/code
