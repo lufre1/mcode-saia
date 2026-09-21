@@ -92,11 +92,50 @@ if [[ -z "$SAIA_API_KEY" ]]; then
   exit 1
 fi
 
-# ── Check mcode is available ─────────────────────────────────────────
+# ── Check/install mcode ──────────────────────────────────────────────
+MCODE_BIN="$HOME/.minimax-code/bin/mcode"
 if ! command -v mcode &>/dev/null; then
-  echo "ERROR: mcode not found in PATH." >&2
-  echo "Install mcode first: npm install -g @minimax-ai/code" >&2
-  exit 1
+  # mcode not in PATH - check if installed in default location
+  if [[ -x "$MCODE_BIN" ]]; then
+    # Found mcode in install location - add to PATH for this session
+    export PATH="$HOME/.minimax-code/bin:$PATH"
+  elif [[ $ASSUME_YES -eq 1 ]]; then
+    echo "mcode not found — installing via official installer..."
+  elif [[ -t 0 ]]; then
+    read -r -p "mcode not found — install it via the official installer? [y/N] " reply
+    if [[ $reply != [yY]* ]]; then
+      echo "Aborted." >&2
+      exit 1
+    fi
+  else
+    echo "ERROR: mcode not found and not in TTY mode — use --yes to auto-install" >&2
+    exit 1
+  fi
+
+  # Install mcode via official GitHub installer if still not found
+  if ! command -v mcode &>/dev/null; then
+    if ! command -v curl &>/dev/null; then
+      echo "ERROR: curl is required to install mcode" >&2
+      exit 1
+    fi
+
+    echo "Downloading and installing mcode..."
+    if ! curl -fsSL https://filecdn.minimax.chat/public/install.sh | bash; then
+      echo "ERROR: mcode installation failed" >&2
+      exit 1
+    fi
+
+    # Add mcode to PATH for this session (official installer updates shell rc, not current PATH)
+    export PATH="$HOME/.minimax-code/bin:$PATH"
+
+    # Verify installation
+    if ! command -v mcode &>/dev/null; then
+      echo "ERROR: mcode installation completed but not found in PATH" >&2
+      exit 1
+    fi
+
+    echo "mcode installed successfully"
+  fi
 fi
 
 # ── Backup existing config if needed ─────────────────────────────────
