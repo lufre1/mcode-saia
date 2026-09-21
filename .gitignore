@@ -1,0 +1,5 @@
+# Generated installer (never edit directly)
+install-mcode-saia.sh
+
+# Backup directories
+*.bak-*
