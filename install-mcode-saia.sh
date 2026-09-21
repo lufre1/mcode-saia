@@ -2,7 +2,7 @@
 #
 # install-mcode-saia.sh — GENERATED FILE, DO NOT EDIT.
 # Regenerate with: ./build.sh  (in the mcode-saia repo)
-# Source: mcode-saia commit unknown-dirty, packed 2026-09-21T08:34:19Z
+# Source: mcode-saia commit 16a4826, packed 2026-09-21T08:40:53Z
 #
 # Installs the GWDG SAIA setup for mcode: provider + 16 models.
 
@@ -37,6 +37,13 @@ for arg in "$@"; do
     *) echo "Unknown option: $arg" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+# ── Read API key from environment ────────────────────────────────────
+if [[ -z "$SAIA_API_KEY" ]]; then
+  echo "ERROR: SAIA_API_KEY environment variable is not set." >&2
+  echo "Set it before running: SAIA_API_KEY=\"your-key\" bash install-mcode-saia.sh" >&2
+  exit 1
+fi
 
 # ── Check mcode is available ─────────────────────────────────────────
 if ! command -v mcode &>/dev/null; then
@@ -83,7 +90,7 @@ echo "       mcode --model custom_provider:gwdg-saia/deepseek-v4-flash-0731"
 
 # ── Packed source files ────────────────────────────────────────────
 echo 'Extracting src/add-saia-mcode.sh...'
-cat >"src/add-saia-mcode.sh" <<__MCS_FILE_EOF__
+cat >"src/add-saia-mcode.sh" <<'__MCS_EOF__'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -206,10 +213,10 @@ mcode provider add \
 echo ""
 echo "Provider added. Verifying..."
 mcode provider list --json | python3 -c "import json,sys; d=json.load(sys.stdin); providers=[p for p in d['providers'] if 'saia' in p.get('name','').lower()]; print(json.dumps(providers, indent=2))"
-__MCS_FILE_EOF__
+__MCS_EOF__
 
 echo 'Extracting src/models.txt...'
-cat >"src/models.txt" <<__MCS_FILE_EOF__
+cat >"src/models.txt" <<'__MCS_EOF__'
 apertus-70b-instruct-2509
 devstral-2-123b-instruct-2512
 qwen3.8-27b
@@ -226,5 +233,5 @@ qwen3.6-35b-a3b
 meta-llama-3.1-8b-instruct
 openai-gpt-oss-120b
 qwen3-30b-a3b-instruct-2507
-__MCS_FILE_EOF__
+__MCS_EOF__
 

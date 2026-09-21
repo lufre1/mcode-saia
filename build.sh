@@ -9,7 +9,6 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-DELIM="${MCS_DELIM_OVERRIDE:-__MCS_FILE_EOF__}"
 OUT="install-mcode-saia.sh"
 MANIFEST=(
   src/add-saia-mcode.sh
@@ -22,8 +21,8 @@ for f in "${MANIFEST[@]}"; do
     echo "ERROR: missing source file: $f" >&2
     exit 1
   fi
-  if grep -qF "$DELIM" "$f"; then
-    echo "ERROR: delimiter '$DELIM' occurs in $f — pick a different delimiter" >&2
+  if grep -qF "__MCS_EOF__" "$f"; then
+    echo "ERROR: delimiter '__MCS_EOF__' occurs in $f — pick a different delimiter" >&2
     exit 1
   fi
   if [[ -n "$(tail -c 1 "$f")" ]]; then
@@ -86,6 +85,13 @@ for arg in "$@"; do
   esac
 done
 
+# ── Read API key from environment ────────────────────────────────────
+if [[ -z "$SAIA_API_KEY" ]]; then
+  echo "ERROR: SAIA_API_KEY environment variable is not set." >&2
+  echo "Set it before running: SAIA_API_KEY=\"your-key\" bash install-mcode-saia.sh" >&2
+  exit 1
+fi
+
 # ── Check mcode is available ─────────────────────────────────────────
 if ! command -v mcode &>/dev/null; then
   echo "ERROR: mcode not found in PATH." >&2
@@ -136,9 +142,9 @@ echo "# ── Packed source files ───────────────
 
 for f in "${MANIFEST[@]}"; do
   echo "echo 'Extracting $f...'" >>"$TMP_OUT"
-  echo "cat >\"$f\" <<$DELIM" >>"$TMP_OUT"
+  echo "cat >\"$f\" <<'__MCS_EOF__'" >>"$TMP_OUT"
   cat "$f" >>"$TMP_OUT"
-  echo "$DELIM" >>"$TMP_OUT"
+  echo "__MCS_EOF__" >>"$TMP_OUT"
   echo "" >>"$TMP_OUT"
 done
 
