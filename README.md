@@ -10,6 +10,10 @@ This repo provides an installer that registers the [GWDG SAIA](https://chat-ai.a
 SAIA_API_KEY="your-key" bash install-mcode-saia.sh --yes
 ```
 
+No key in the environment? Run `bash install-mcode-saia.sh --yes` and it asks for one
+(or pass `--key <value>` / `--key-file <path>`). Reinstalls reuse the key already in
+your mcode config, so you only ever type it once.
+
 This one-shot installer:
 - Installs mcode (if missing) via the official GitHub installer
 - Registers the GWDG SAIA provider with 16 ready models

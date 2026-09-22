@@ -6,7 +6,8 @@ This installer registers the GWDG SAIA provider in mcode (MiniMax Code) with all
 
 ## Prerequisites
 
-- **SAIA API key** (from GWDG SAIA)
+- **SAIA API key** (from GWDG SAIA) — the installer reuses the key from a previous
+  install, and prompts for it only when there is none
 - **mcode** will be installed automatically if missing (via the official GitHub installer)
 
 ## Quick start
@@ -37,6 +38,10 @@ bash install-mcode-saia.sh --key "your-key" --yes
 
 # Option C: via --key-file (reads from a file)
 bash install-mcode-saia.sh --key-file ~/.local/share/opencode/auth.json --yes
+
+# Option D: pass nothing — reuses the key from a previous install,
+# or asks for it (input hidden) if this is the first one
+bash install-mcode-saia.sh --yes
 ```
 
 The `--yes` flag enables non-interactive mode and auto-installs mcode if missing. Without it, the installer will prompt before installing mcode.
@@ -217,7 +222,9 @@ npm install -g @minimax-ai/code
 
 ### API key errors
 
-- Ensure `SAIA_API_KEY` is set correctly (no quotes in the env var value)
+- Ensure `SAIA_API_KEY` is set correctly (no quotes in the env var value); with no
+  key set at all, the installer asks for one, and fails only if there is no terminal
+  to ask on (CI, cron) — set the env var there
 - Verify the key is valid at the GWDG SAIA portal
 - Check rate limits: 30 req/min, 200/hour, 1000/day, 3000/month per key
 

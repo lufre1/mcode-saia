@@ -2,13 +2,13 @@
 #
 # install-mcode-saia.sh — GENERATED FILE, DO NOT EDIT.
 # Regenerate with: ./build.sh  (in the mcode-saia repo)
-# Source: mcode-saia commit f409d15-dirty, packed 2026-09-21T12:59:24Z
+# Source: mcode-saia commit 70ce3c7-dirty, packed 2026-09-22T07:59:13Z
 #
 # Installs the GWDG SAIA setup for mcode: provider + 16 models.
 
 set -euo pipefail
 
-CONFIG_DIR="$HOME/.minimax"
+CONFIG_DIR="${MINIMAX_DATA_DIR:-$HOME/.minimax}"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 BACKUP_DIR=""
 
@@ -21,28 +21,76 @@ Installs the GWDG SAIA setup for mcode:
   - Configures provider with base URL and API format
 
 Options:
-  -y, --yes        answer yes to prompts (e.g. installing mcode)
-  -h, --help       show this help
+  -y, --yes           answer yes to prompts (e.g. installing mcode)
+      --key <value>   SAIA API key (overrides SAIA_API_KEY env)
+      --key-file <p>  file containing the SAIA API key
+  -h, --help          show this help
 
-The API key must be provided via the SAIA_API_KEY environment variable.
+The API key is taken from --key, --key-file or the SAIA_API_KEY environment
+variable; if none of them is set, you are prompted for it.
 Files that would be overwritten are backed up to ~/.minimax.bak-<timestamp>/ first.
 USAGE
 }
 
+# Pull the key out of a previous install so a reinstall does not ask again.
+# Scoped to the gwdg-saia* block under custom_provider: the minimax provider
+# has an apiKey too, and grabbing that one would install a broken key.
+key_from_config() {
+  local cfg="${MINIMAX_DATA_DIR:-$HOME/.minimax}/config.yaml"
+  [[ -f "$cfg" ]] || return 0
+  awk '/^custom_provider:/{s=1;next} /^[^ ]/{s=0} s&&/^  [A-Za-z]/{p=($1~/^gwdg-saia/)} s&&p&&$1=="apiKey:"{print $2;exit}' "$cfg"
+  return 0
+}
+
+prompt_for_key() {
+  if ! { : </dev/tty; } 2>/dev/null; then   # -r only stats; this actually opens it
+    echo "ERROR: No SAIA API key given and no terminal to ask on." >&2
+    echo "Set it: SAIA_API_KEY=\"your-key\" bash install-mcode-saia.sh" >&2
+    echo "Get one at https://chat-ai.academiccloud.de/" >&2
+    exit 1
+  fi
+  local key=""
+  for _ in 1 2 3; do
+    read -rsp "GWDG SAIA API key (input hidden): " key </dev/tty
+    echo >&2
+    key="${key//[[:space:]]/}"   # paste hygiene; SAIA keys carry no whitespace
+    if [[ -n "$key" ]]; then
+      export SAIA_API_KEY="$key"
+      return
+    fi
+    echo "Key cannot be empty." >&2
+  done
+  echo "ERROR: no key entered." >&2
+  exit 1
+}
+
 ASSUME_YES=0
-for arg in "$@"; do
-  case "$arg" in
-    -y|--yes) ASSUME_YES=1 ;;
+KEY=""
+KEY_FILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -y|--yes) ASSUME_YES=1; shift ;;
+    --key|--key-file)
+      [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
+      if [[ $1 == --key ]]; then KEY="$2"; else KEY_FILE="$2"; fi
+      shift 2
+      ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "Unknown option: $arg" >&2; usage >&2; exit 2 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-# ── Read API key from environment ────────────────────────────────────
-if [[ -z "$SAIA_API_KEY" ]]; then
-  echo "ERROR: SAIA_API_KEY environment variable is not set." >&2
-  echo "Set it before running: SAIA_API_KEY=\"your-key\" bash install-mcode-saia.sh" >&2
-  exit 1
+# ── Obtain the API key ───────────────────────────────────────────────
+# Reuse a key from a previous install; only ask when there is none to reuse,
+# and ask before anything is installed, so an empty-handed user loses nothing.
+if [[ -z "$KEY" && -z "$KEY_FILE" && -z "${SAIA_API_KEY:-}" ]]; then
+  SAIA_API_KEY="$(key_from_config)"
+  if [[ -n "$SAIA_API_KEY" ]]; then
+    export SAIA_API_KEY
+    echo "Reusing the SAIA key already in $CONFIG_FILE (pass --key to replace it)."
+  else
+    prompt_for_key
+  fi
 fi
 
 # ── Check/install mcode ──────────────────────────────────────────────
@@ -147,6 +195,7 @@ MODELS_FILE="${SCRIPT_DIR}/models.txt"
 # ── Parse arguments ──────────────────────────────────────────────────
 KEY=""
 KEY_FILE=""
+SAIA_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -167,9 +216,11 @@ while [[ $# -gt 0 ]]; do
       echo "  -h, --help          Show this help"
       echo ""
       echo "The API key is taken from:"
-      echo "  1. SAIA_API_KEY environment variable (if set)"
-      echo "  2. --key <value> argument (if provided)"
+      echo "  1. --key <value> argument (if provided)"
+      echo "  2. SAIA_API_KEY environment variable (if set)"
       echo "  3. --key-file <path> (reads first line)"
+      echo "  4. the key stored by a previous install, if any"
+      echo "  5. an interactive prompt, if none of the above is set"
       exit 0
       ;;
     *)
@@ -179,10 +230,42 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Pull the key out of a previous install so a reinstall does not ask again.
+# Scoped to the gwdg-saia* block under custom_provider: the minimax provider
+# has an apiKey too, and grabbing that one would install a broken key.
+key_from_config() {
+  local cfg="${MINIMAX_DATA_DIR:-$HOME/.minimax}/config.yaml"
+  [[ -f "$cfg" ]] || return 0
+  awk '/^custom_provider:/{s=1;next} /^[^ ]/{s=0} s&&/^  [A-Za-z]/{p=($1~/^gwdg-saia/)} s&&p&&$1=="apiKey:"{print $2;exit}' "$cfg"
+  return 0
+}
+
+prompt_for_key() {
+  if ! { : </dev/tty; } 2>/dev/null; then   # -r only stats; this actually opens it
+    echo "ERROR: No SAIA API key given and no terminal to ask on." >&2
+    echo "Set it: SAIA_API_KEY=\"your-key\" ./add-saia-mcode.sh" >&2
+    echo "Get one at https://chat-ai.academiccloud.de/" >&2
+    exit 1
+  fi
+  local key=""
+  for _ in 1 2 3; do
+    read -rsp "GWDG SAIA API key (input hidden): " key </dev/tty
+    echo >&2
+    key="${key//[[:space:]]/}"   # paste hygiene; SAIA keys carry no whitespace
+    if [[ -n "$key" ]]; then
+      export SAIA_API_KEY="$key"
+      return
+    fi
+    echo "Key cannot be empty." >&2
+  done
+  echo "ERROR: no key entered." >&2
+  exit 1
+}
+
 # ── Obtain API key ───────────────────────────────────────────────────
 if [[ -n "$KEY" ]]; then
   SAIA_KEY="$KEY"
-elif [[ -n "$SAIA_API_KEY" ]]; then
+elif [[ -n "${SAIA_API_KEY:-}" ]]; then
   SAIA_KEY="$SAIA_API_KEY"
 elif [[ -n "$KEY_FILE" ]]; then
   if [[ ! -f "$KEY_FILE" ]]; then
@@ -198,15 +281,23 @@ elif [[ -n "$KEY_FILE" ]]; then
     SAIA_KEY=$(head -n 1 "$KEY_FILE" 2>/dev/null || echo "")
   fi
 else
-  echo "ERROR: No SAIA API key provided." >&2
-  echo "Set SAIA_API_KEY env var, or use --key <value> or --key-file <path>." >&2
-  exit 1
+  SAIA_KEY="$(key_from_config)"
+  if [[ -n "$SAIA_KEY" ]]; then
+    echo "Reusing the SAIA key already in your mcode config (pass --key to replace it)."
+  else
+    prompt_for_key
+    SAIA_KEY="$SAIA_API_KEY"
+  fi
 fi
 
 if [[ -z "$SAIA_KEY" ]]; then
   echo "ERROR: SAIA_API_KEY is empty." >&2
   exit 1
 fi
+
+# `mcode provider add --api-key-env` reads the ENVIRONMENT, not this variable:
+# without the export, --key and --key-file register an empty key.
+export SAIA_API_KEY="$SAIA_KEY"
 
 # ── Load models ──────────────────────────────────────────────────────
 if [[ ! -f "$MODELS_FILE" ]]; then
@@ -330,7 +421,11 @@ qwen3-30b-a3b-instruct-2507
 __MCS_EOF__
 
 chmod +x "$EXTRACT_DIR/src/add-saia-mcode.sh"
-"$EXTRACT_DIR/src/add-saia-mcode.sh"
+CHILD_ARGS=()
+if [[ -n "$KEY" ]]; then CHILD_ARGS+=(--key "$KEY"); fi
+if [[ -n "$KEY_FILE" ]]; then CHILD_ARGS+=(--key-file "$KEY_FILE"); fi
+# ${a[@]+"${a[@]}"}: bash 3.2 (stock macOS) calls an empty array unbound under set -u
+"$EXTRACT_DIR/src/add-saia-mcode.sh" ${CHILD_ARGS[@]+"${CHILD_ARGS[@]}"}
 
 echo ""
 echo "✓ GWDG SAIA provider installed successfully!"
